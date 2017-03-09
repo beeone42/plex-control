@@ -16,6 +16,12 @@ def open_and_load_config():
         print "File [%s] doesn't exist, aborting." % (CONFIG_FILE)
         sys.exit(1)
 
+def hour(ms):
+    s = int(ms /    1000) % 60
+    m = int(ms /   60000) % 60
+    h = int(ms / 3600000)
+    return '{:d}:{:02d}:{:02d}'.format(h, m, s)
+    
 @app.route("/")
 def hello():
     url = config['plex-url']
@@ -48,17 +54,18 @@ def status():
     s = res["MediaContainer"]["@size"]
     for v in res["MediaContainer"]["Video"]:
         tmp = {"title":v["@title"],
-                      "kind":v["@type"],
-                      "user":v["User"]["@title"],
-                      "player":v["Player"]["@title"],
-                      "state":v["Player"]["@state"],
-                      "address":v["Player"]["@address"],
-                      "media":v["Media"]["Part"]["@file"]
+               "kind":v["@type"],
+               "user":v["User"]["@title"],
+               "player":v["Player"]["@title"],
+               "state":v["Player"]["@state"],
+               "address":v["Player"]["@address"],
+               "media":v["Media"]["Part"]["@file"],
+               "pos":hour(v["@viewOffset"]) + "/" + hour(v["@duration"])
            }
         if (v["@type"] == "episode" and "@grandparentTitle" in v):
             tmp['title'] = v["@grandparentTitle"]
             if ("@parentIndex" in v and "@index" in v):
-                tmp['title'] = tmp['title'] + " S" + str(v["@parentIndex"]) + "E" + str(v["@index"]) + " " + v["@title"]
+                tmp['title'] = '{} S{:02d}E{:02d} {}'.format(tmp['title'], v["@parentIndex"], v["@index"], v["@title"])
         datas.append(tmp)
     return jsonify(datas)
 
