@@ -3,6 +3,7 @@ from flask import Flask, jsonify, request
 from xmljson import badgerfish as bf
 from xml.etree.ElementTree import fromstring
 import requests
+from subprocess import call
 
 CONFIG_FILE = 'config.json'
 
@@ -26,7 +27,7 @@ def hour(ms):
 def hello():
     url = config['plex-url']
     params = {"X-Plex-Token": config['plex-token']}
-    r = requests.get(url, params=params)
+    r = requests.get(url, params=params, timeout=(1, 5))
     res = bf.data(fromstring(r.text))
     m = res["MediaContainer"]
     datas = {
@@ -40,7 +41,7 @@ def hello():
 def server():
     url = config['plex-url'] + "servers"
     params = {"X-Plex-Token": config['plex-token']}
-    r = requests.get(url, params=params)
+    r = requests.get(url, params=params, timeout=(1, 5))
     res = bf.data(fromstring(r.text))
     return jsonify(res)
 
@@ -48,20 +49,19 @@ def server():
 def status():
     url = config['plex-url'] + "status/sessions"
     params = {"X-Plex-Token": config['plex-token']}
-    r = requests.get(url, params=params)
+    r = requests.get(url, params=params, timeout=(1, 5))
     res = bf.data(fromstring(r.text))
     datas = []
     s = res["MediaContainer"]["@size"]
     for v in res["MediaContainer"]["Video"]:
-        tmp = {"title":v["@title"],
-               "kind":v["@type"],
-               "user":v["User"]["@title"],
-               "player":v["Player"]["@title"],
-               "state":v["Player"]["@state"],
-               "address":v["Player"]["@address"],
-               "media":v["Media"]["Part"]["@file"],
-               "pos":hour(v["@viewOffset"]) + "/" + hour(v["@duration"])
-           }
+        tmp = {"title":v["@title"], "kind":v["@type"]}
+        tmp["user"] = v["User"]["@title"]
+        tmp["player"] = v["Player"]["@title"]
+        tmp["state"] = v["Player"]["@state"]
+        tmp["address"] = v["Player"]["@address"]
+        tmp["media"] = v["Media"]["Part"]["@file"]
+        tmp["pos"] = hour(v["@viewOffset"]) + "/" + hour(v["@duration"])
+
         if (v["@type"] == "episode" and "@grandparentTitle" in v):
             tmp['title'] = v["@grandparentTitle"]
             if ("@parentIndex" in v and "@index" in v):
@@ -73,9 +73,16 @@ def status():
 def sessions():
     url = config['plex-url'] + "status/sessions"
     params = {"X-Plex-Token": config['plex-token']}
-    r = requests.get(url, params=params)
+    r = requests.get(url, params=params, timeout=(1, 5))
     res = bf.data(fromstring(r.text))
     return jsonify(res)
+
+@app.route("/restart")
+def restart():
+    call(["service", "plexmediaserver", "restart"])
+    return jsonify({"result":"ok"})
+
+
 
 if __name__ == "__main__":
     config = open_and_load_config()
